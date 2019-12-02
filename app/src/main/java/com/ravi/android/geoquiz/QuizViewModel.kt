@@ -15,8 +15,11 @@ class QuizViewModel : ViewModel() {
         Question(R.string.question_americas, true),
         Question(R.string.question_asia, true))
 
+    var questionCheatBank: BooleanArray = BooleanArray(questionBank.size){false}
+
     private var currentScore = 0
     private var questionsAnswered = 0
+    var isCheater = false
 
     var currentIndex: Int = 0
 
@@ -25,6 +28,12 @@ class QuizViewModel : ViewModel() {
 
     val currentQuestionText: Int
         get() = questionBank[currentIndex].textResId
+
+    val currentQuestionCheatStatus: Boolean
+        get() = questionCheatBank[currentIndex]
+
+    val currentQuestionCheatNumber: Int
+        get() = questionCheatBank.count {it}
 
     fun moveToNext() {
         currentIndex = (currentIndex + 1) % questionBank.size

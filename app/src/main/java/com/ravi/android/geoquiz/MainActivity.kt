@@ -1,5 +1,9 @@
 package com.ravi.android.geoquiz
 
+import android.app.Activity
+import android.app.ActivityOptions
+import android.content.Intent
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.PersistableBundle
@@ -17,6 +21,7 @@ import kotlinx.android.synthetic.main.activity_main.*
 
 private const val TAG = "MainActivity"
 private const val KEY_INDEX = "index"
+private const val REQUEST_CODE_CHEAT = 0
 
 
 class MainActivity : AppCompatActivity() {
@@ -26,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var nextButton: ImageButton
     private lateinit var prevButton: ImageButton
     private lateinit var questionTextView: TextView
+    private lateinit var cheatButton: Button
     private val quizViewModel: QuizViewModel by lazy {
         ViewModelProviders.of(this).get(QuizViewModel::class.java)
     }
@@ -42,10 +48,10 @@ class MainActivity : AppCompatActivity() {
 
         trueButton = findViewById(R.id.true_button)
         falseButton = findViewById(R.id.false_button)
+        cheatButton = findViewById(R.id.cheat_button)
         nextButton = findViewById(R.id.next_button)
         questionTextView = findViewById(R.id.question_text_view)
         prevButton = findViewById(R.id.prev_button)
-
         trueButton.setOnClickListener { view: View ->
             checkAnswer(true)
 
@@ -60,6 +66,17 @@ class MainActivity : AppCompatActivity() {
             quizViewModel.moveToNext()
             updateQuestion()
             toggleAnswerBtns(true)
+        }
+        cheatButton.setOnClickListener { view: View ->
+           val answerIsTrue = quizViewModel.currentQuestionAnswer
+            val intent = CheatActivity.newIntent(this@MainActivity, answerIsTrue)
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val options = ActivityOptions
+                    .makeClipRevealAnimation(view, 0, 0, view.width, view.height)
+                startActivityForResult(intent, REQUEST_CODE_CHEAT, options.toBundle())
+            } else {
+                startActivityForResult(intent, REQUEST_CODE_CHEAT)
+            }
         }
 
         prevButton.setOnClickListener { view: View ->
@@ -76,9 +93,23 @@ class MainActivity : AppCompatActivity() {
         updateQuestion()
     }
 
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != Activity.RESULT_OK) {
+            return
+        }
+        if(requestCode == REQUEST_CODE_CHEAT) {
+            quizViewModel.isCheater = data?.getBooleanExtra(EXTRA_ANSWER_SHOWN, false) ?: false
+            val quizCheatShown = data?.getBooleanExtra(EXTRA_ANSWER_SHOWN, false)
+            quizViewModel.questionCheatBank[quizViewModel.currentIndex] = quizCheatShown ?: false
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "onResume() called")
+        checkNumberOfCheatsUsed()
     }
 
     override fun onPause() {
@@ -111,10 +142,11 @@ class MainActivity : AppCompatActivity() {
         toggleAnswerBtns(false)
         val correctAnswer = quizViewModel.currentQuestionAnswer
 
-        val messageResId = if (userAnswer == correctAnswer) {
-            R.string.correct_toast
-        } else {
-            R.string.incorrect_toast
+        val messageResId = when {
+            //quizViewModel.isCheater -> R.string.judgment_toast
+            quizViewModel.questionCheatBank[quizViewModel.currentIndex] -> R.string.judgment_toast
+            userAnswer == correctAnswer -> R.string.correct_toast
+            else -> R.string.incorrect_toast
         }
 
         Toast.makeText(this, messageResId, Toast.LENGTH_SHORT)
@@ -124,6 +156,13 @@ class MainActivity : AppCompatActivity() {
     private fun toggleAnswerBtns(toggle: Boolean){
         trueButton.isEnabled = toggle
         falseButton.isEnabled = toggle
+    }
+
+    private fun checkNumberOfCheatsUsed(){
+        val cheats = quizViewModel.currentQuestionCheatNumber
+        if(cheats >= 3 ){
+            cheatButton.isEnabled = false
+        }
     }
 //
 //    private fun totalQuestionsAnswered(){
